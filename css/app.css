@@ -137,17 +137,21 @@ body.panel-open .stage {
   display: flex;
   flex-direction: column;
   justify-content: flex-end; /* 新しい字幕が下に入り、古いものは上へ押し出される */
-  align-items: center;
   gap: calc(var(--sub-size) * 0.6);
   min-height: 0;
-  overflow: hidden;
-  padding: 48px 4vw 104px;
+  overflow: hidden; /* 下から入ってくる字幕は、この枠の下端から現れる */
+  margin-bottom: 104px; /* 下のバーのための空き。バーが隠れている間は狭くする */
+  padding: 48px 3vw 0;
   font-size: var(--sub-size);
+  transition: margin-bottom 0.25s ease;
+}
+
+body.bar-hidden .subs {
+  margin-bottom: 28px;
 }
 
 .sub {
-  width: min(100%, 44ch); /* 1行およそ42字まで */
-  animation: sub-in 0.18s ease-out;
+  width: 100%; /* 画面の左右いっぱいまで使ってから改行する */
 }
 
 .sub-en {
@@ -155,7 +159,6 @@ body.panel-open .stage {
   font-weight: 600;
   line-height: 1.32;
   overflow-wrap: break-word; /* 単語の途中では改行しない（収まらない長い語だけ例外） */
-  text-wrap: balance;
 }
 
 .sub-ja {
@@ -178,6 +181,21 @@ body.panel-open .stage {
 .sub[data-kind="draft"] .sub-en {
   color: var(--sub-dim);
   font-weight: 500;
+}
+
+/* 速報訳の出し方（設定で切り替え）：小さく表示／表示しない */
+.subs[data-draft="small"] .sub[data-kind="draft"] .sub-en {
+  font-size: 0.46em;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.subs[data-draft="hide"] .sub[data-kind="draft"] .sub-en {
+  display: none;
+}
+
+.subs[data-draft="hide"][data-source="off"] .sub[data-kind="draft"] {
+  display: none;
 }
 
 .sub[data-age="2"] {
@@ -208,13 +226,6 @@ body.panel-open .stage {
   letter-spacing: 0;
   line-height: 1.2;
   user-select: none;
-}
-
-@keyframes sub-in {
-  from {
-    opacity: 0;
-    transform: translateY(0.35em);
-  }
 }
 
 /* ---- 下の細いバー ---- */
@@ -363,11 +374,8 @@ body.panel-open .panel {
 @media (prefers-reduced-motion: reduce) {
   .stage,
   .panel,
-  .bar {
+  .bar,
+  .subs {
     transition: none;
-  }
-
-  .sub {
-    animation: none;
   }
 }

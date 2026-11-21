@@ -5,12 +5,26 @@ const PROMPT_URL = new URL('../../prompts/translate.md', import.meta.url);
 
 /** 英語のレベル（CEFR：語学力の国際的な目安）。id は指示文の見出し「レベル A1」などに対応する。 */
 export const LEVELS = [
+  { id: 'Pre-A1', label: 'Pre-A1（英検4級程度）' },
   { id: 'A1', label: 'A1（英検3級程度）' },
   { id: 'A2', label: 'A2（英検準2級程度）' },
   { id: 'B1', label: 'B1（英検2級程度）' },
   { id: 'B2', label: 'B2（英検準1級程度）' },
   { id: 'C1', label: 'C1（英検1級程度）' },
 ];
+
+/**
+ * 単語に日本語の意味を付ける設定の選択肢。
+ * off = 付けない / same = 字幕のレベルと同じ単語だけ / レベルのid = そのレベル以上の単語
+ */
+export const GLOSS_OPTIONS = [
+  { id: 'off', label: '付けない' },
+  { id: 'same', label: '字幕のレベルと同じ単語だけ' },
+  ...LEVELS.map((l) => ({ id: l.id, label: `${l.label}以上の単語` })),
+];
+
+const GLOSS_PLACEHOLDER = '{{注釈する単語}}';
+const MAX_SUBTITLE_CHARS = 220; // これより長い返事は字幕として異常とみなす（指示の上限は84字）
 
 /** 訳し方。section は指示文の見出しの名前。 */
 export const STYLES = [
@@ -70,11 +84,17 @@ function need(sections, title) {
  * 翻訳エンジンへの指示（毎回同じ部分）を作る。
  * glossary は用語集：[{ ja: '日本語の表記', reading: '読み', en: '英語での表記' }]
  */
-export function buildSystem(sections, { level, style, glossary = [], gloss = false }) {
+export function buildSystem(sections, { level, style, glossary = [], gloss = 'off' }) {
   const styleInfo = STYLES.find((s) => s.id === style) || STYLES[0];
   const parts = [need(sections, '共通ルール'), need(sections, `レベル ${level}`), need(sections, styleInfo.section)];
-  // gloss=true のときは、選んだレベルの単語に日本語の意味を付けさせる。
-  if (gloss) parts.push(need(sections, '単語の注釈'));
+  // 単語に日本語の意味を付けさせる場合は、どのレベルの単語に付けるかを指示文に書き込む。
+  if (gloss && gloss !== 'off') {
+    const label = (id) => LEVELS.find((l) => l.id === id)?.label || id;
+    const target =
+      gloss === 'same' ? `字幕のレベル（CEFR ${label(level)}）にちょうど当たる単語` : `CEFR ${label(gloss)} 以上の難しさの単語`;
+    const body = need(sections, '単語の注釈');
+    parts.push(body.includes(GLOSS_PLACEHOLDER) ? body.replace(GLOSS_PLACEHOLDER, target) : `${body}\n\n意味を付ける対象：${target}`);
+  }
   if (glossary.length) {
     const rows = glossary.map((g) => `- ${g.ja}${g.reading ? `（${g.reading}）` : ''} → ${g.en}`);
     parts.push(`用語集（次の言葉は、必ずこの英語表記を使う）\n${rows.join('\n')}`);
@@ -102,13 +122,23 @@ export function buildUser({ source, previous = [], topic = '' }) {
   return parts.join('\n\n');
 }
 
-/** 返ってきた文章を字幕用に整える。skip=true は「字幕にする内容がない」という返事。 */
+/**
+ * 返ってきた文章を字幕用に整える。
+ *   skip=true    「字幕にする内容がない」という返事
+ *   invalid=true 字幕として異常な返事（長すぎる、考えた内容が混じっている など）。画面には出さない。
+ */
 export function cleanOutput(raw) {
   let text = (raw || '').trim();
+  // 考えた内容をタグつきで書いてきた場合は、その部分を捨てる
+  text = text.replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, '').trim();
   // 引用符で囲んで返してきた場合は外す
   text = text.replace(/^["“”']+|["“”']+$/g, '').trim();
-  if (!text || /^\[?\s*skip\s*\]?\.?$/i.test(text)) return { text: '', skip: true };
-  return { text: text.replace(/\s*\n+\s*/g, ' '), skip: false };
+  if (!text || /^\[?\s*skip\s*\]?\.?$/i.test(text)) return { text: '', skip: true, invalid: false };
+  text = text.replace(/\s*\n+\s*/g, ' ');
+  // 長さは、単語の意味の印 {英語|日本語} を除いた英文で数える
+  const plain = text.replace(/\{([^{}|]*)\|[^{}]*\}/g, '$1');
+  if (plain.length > MAX_SUBTITLE_CHARS) return { text: '', skip: false, invalid: true };
+  return { text, skip: false, invalid: false };
 }
 
 /**

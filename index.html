@@ -112,11 +112,19 @@
           <span class="switch-ui" aria-hidden="true"></span>
           <span class="switch-text"><b>日本語の原文を表示</b><small>英語の字幕の下に、聞き取った日本語を小さく出します。</small></span>
         </label>
-        <label class="switch">
-          <input type="checkbox" id="chkGloss">
-          <span class="switch-ui" aria-hidden="true"></span>
-          <span class="switch-text"><b>単語に日本語の意味を付ける</b><small>選んだレベルちょうどの単語の上に、日本語を小さく出します。それより易しい単語には付きません。次の文から反映されます。</small></span>
+        <label class="stack">
+          <span class="label">速報訳（灰色の字）</span>
+          <select id="draft" class="select">
+            <option value="show">表示する</option>
+            <option value="small">小さく表示する</option>
+            <option value="hide">表示しない</option>
+          </select>
         </label>
+        <label class="stack">
+          <span class="label">単語に日本語の意味を付ける</span>
+          <select id="gloss" class="select"></select>
+        </label>
+        <p class="hint">選んだ範囲の単語の上に、日本語を小さく出します。それより易しい単語には付きません。1つの字幕で3つまでです。次の文から反映されます。</p>
       </section>
 
       <section class="panel-sec">

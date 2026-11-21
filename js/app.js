@@ -8,7 +8,7 @@ import { toDb, FLOOR_DB } from './meter.js';
 import { loadSettings, saveSettings } from './settings.js';
 import { STT_ENGINES } from './stt/index.js';
 import { TRANSLATORS, QUALITY_MODES } from './translate/index.js';
-import { LEVELS, STYLES, loadPrompt } from './translate/prompt.js';
+import { LEVELS, STYLES, GLOSS_OPTIONS, loadPrompt } from './translate/prompt.js';
 import { SubtitlePipeline } from './pipeline.js';
 import { SubtitleView } from './subtitle-view.js';
 
@@ -59,7 +59,8 @@ function applyDisplay() {
   const d = settings.display;
   $('stage').style.setProperty('--sub-size', `${d.fontSize}vh`);
   $('subs').dataset.source = d.showSource ? 'on' : 'off';
-  $('subs').dataset.gloss = d.gloss ? 'on' : 'off';
+  $('subs').dataset.gloss = d.gloss !== 'off' ? 'on' : 'off';
+  $('subs').dataset.draft = d.draft;
   $('fontSize').value = d.fontSize;
   $('fontSizeOut').textContent = `（画面の高さの ${d.fontSize.toFixed(1)}％）`;
   $('stLevel').textContent = settings.translation.level;
@@ -67,7 +68,7 @@ function applyDisplay() {
 }
 
 function renderSubs() {
-  view.render(lastRows, { maxRows: settings.display.rows, gloss: settings.display.gloss });
+  view.render(lastRows, { maxRows: settings.display.rows, gloss: settings.display.gloss !== 'off' });
 }
 
 function updateWelcome() {
@@ -381,6 +382,10 @@ function setFontSize(value) {
 function initControls() {
   const t = settings.translation;
   const engine = TRANSLATORS[t.engine] || TRANSLATORS.claude;
+  // 保存されていた値が選択肢にない場合は、初期値に戻す。
+  if (!LEVELS.some((l) => l.id === t.level)) t.level = 'A1';
+  if (!GLOSS_OPTIONS.some((g) => g.id === settings.display.gloss)) settings.display.gloss = 'off';
+  if (!['show', 'small', 'hide'].includes(settings.display.draft)) settings.display.draft = 'show';
   fillSelect($('level'), LEVELS, t.level);
   fillSelect($('quickLevel'), LEVELS.map((l) => ({ id: l.id, label: l.id })), t.level);
   fillSelect($('style'), STYLES, t.style);
@@ -388,7 +393,8 @@ function initControls() {
   fillSelect($('quality'), QUALITY_MODES, t.quality);
   $('rows').value = String(settings.display.rows);
   $('chkSource').checked = settings.display.showSource;
-  $('chkGloss').checked = settings.display.gloss;
+  fillSelect($('gloss'), GLOSS_OPTIONS, settings.display.gloss);
+  $('draft').value = settings.display.draft;
   $('keySoniox').value = settings.keys.soniox;
   $('keyAnthropic').value = settings.keys.anthropic;
 
@@ -416,9 +422,13 @@ function initControls() {
     settings.display.showSource = $('chkSource').checked;
     changed();
   });
-  $('chkGloss').addEventListener('change', () => {
-    settings.display.gloss = $('chkGloss').checked;
+  $('gloss').addEventListener('change', () => {
+    settings.display.gloss = $('gloss').value;
     translationChanged();
+  });
+  $('draft').addEventListener('change', () => {
+    settings.display.draft = $('draft').value;
+    changed();
   });
 
   for (const [id, key] of [

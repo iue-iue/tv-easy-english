@@ -225,7 +225,7 @@ export class SubtitlePipeline {
             const ms = performance.now() - row.cutAt;
             this.llmMs = this.llmMs ? this.llmMs * 0.7 + ms * 0.3 : ms;
           }
-          row.text = cleanOutput(partial).text;
+          row.text = cleanOutput(partial).text; // 異常に長い返事などは空になり、画面には出ない
           this.emit();
         },
       });
@@ -233,8 +233,10 @@ export class SubtitlePipeline {
       const result = await Promise.race([request, timedOut]);
 
       const cleaned = cleanOutput(result.text);
-      if (result.refused) {
-        this.finishWithDraft(row); // モデルが応答を断った場合も、速報訳で先へ進む
+      if (result.refused || cleaned.invalid) {
+        // モデルが応答を断った場合や、字幕として異常な返事（長すぎるなど）の場合は、速報訳で先へ進む
+        row.text = '';
+        this.finishWithDraft(row);
       } else if (cleaned.skip) {
         this.remove(row); // 字幕にする内容がない（あいづち、BGMの誤認識など）
       } else {
@@ -305,7 +307,8 @@ export class SubtitlePipeline {
         system: buildMemoSystem(this.sections),
         user: `<transcript>\n${this.recentSources.join('\n')}\n</transcript>`,
       });
-      if (memo && memo !== '不明') this.topic = memo;
+      // 2行のメモのはずなので、長すぎる返事は異常とみなして使わない。
+      if (memo && memo !== '不明' && memo.length <= 200) this.topic = memo;
     } catch {
       // 話題メモは補助なので、失敗しても字幕は続ける
     } finally {

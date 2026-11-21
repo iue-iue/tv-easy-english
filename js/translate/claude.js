@@ -47,12 +47,16 @@ function tuning(model, quality) {
     // Opus 5.5 は「考えない」設定ができない。effort で調整する。
     return { thinking: null, effort: quality === 'quality' ? 'medium' : 'low', maxTokens: 4096 };
   }
+  if (model === 'claude-haiku-5-5') {
+    // Haiku 5.5 は「考えない」設定にすると、考えた内容を答えの文章に書いてしまうことがある。
+    // 公式の案内どおり、設定は変えずに effort を下げて考える量を減らす。
+    return { thinking: null, effort: quality === 'quality' ? 'medium' : 'low', maxTokens: 2048 };
+  }
   if (quality === 'quality') {
     return { thinking: { type: 'adaptive' }, effort: 'medium', maxTokens: 4096 };
   }
-  // 考えずにすぐ訳し始める設定。書き方がモデルによって違う。
-  const off = model === 'claude-sonnet-5-5' ? { type: 'between_tools' } : { type: 'disabled' };
-  return { thinking: off, effort: quality === 'speed' ? 'low' : 'medium', maxTokens: 1024 };
+  // Sonnet 5.5 用の、考えずにすぐ訳し始める設定。
+  return { thinking: { type: 'between_tools' }, effort: quality === 'speed' ? 'low' : 'medium', maxTokens: 1024 };
 }
 
 // エラーを、利用者に見せる日本語の説明に直す。fatal=true は「設定を直すまで何度やっても失敗する」もの。
@@ -66,7 +70,7 @@ function explain(e) {
   if (err.aborted) {
     err.message = '中断しました';
   } else if (status === 401) {
-    err.message = 'ClaudeのAPIキーが正しくありません。設定で入力し直してください。';
+    err.message = 'ClaudeのAPIキーが正しくないか、有効期限が切れています。設定で入力し直してください。';
     err.fatal = true;
   } else if (status === 403) {
     err.message = 'このClaudeのAPIキーでは利用が許可されていません。';
@@ -176,14 +180,13 @@ export class ClaudeTranslator {
   }
 
   /** 短い文章を1回で受け取る（話題メモ用）。 */
-  async complete({ system, user, maxTokens = 400 }) {
+  async complete({ system, user, maxTokens = 1024 }) {
     try {
       const client = await this.client();
       const message = await client.messages.create({
         model: MEMO_MODEL,
-        max_tokens: maxTokens,
-        thinking: { type: 'disabled' },
-        output_config: { effort: 'low' },
+        max_tokens: maxTokens, // 考える分の余裕を含む
+        output_config: { effort: 'low' }, // 「考えない」設定は使わず、effort で考える量を減らす（字幕の訳と同じ理由）
         system,
         messages: [{ role: 'user', content: user }],
       });
