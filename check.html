@@ -8,6 +8,16 @@
   <title>音の入り口の確認｜やさしい英語字幕</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css">
+  <script>
+    // アプリの更新を確実に反映させる仕組み（sw.js）を登録する。index.html と同じもの。
+    if ('serviceWorker' in navigator) {
+      const hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController) location.reload();
+      });
+    }
+  </script>
 </head>
 <body>
   <header class="top">

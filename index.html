@@ -9,6 +9,17 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/app.css">
+  <script>
+    // アプリの更新を確実に反映させる仕組み（sw.js）を登録する。
+    // 初めて有効になったときだけ、最新のファイルで1回読み込み直す（古いファイルが混ざった状態を直すため）。
+    if ('serviceWorker' in navigator) {
+      const hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController) location.reload();
+      });
+    }
+  </script>
 </head>
 <body class="app">
   <!-- 字幕を出す画面 -->
