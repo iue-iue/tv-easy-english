@@ -4,6 +4,7 @@
 import { parseGloss } from './translate/prompt.js';
 
 const MOVE = 'transform 0.32s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.32s ease';
+const MAX_ROWS = 10; // 画面に置いておく字幕の上限。画面に収まらない古い字幕は、上端で自然に見えなくなる。
 
 export class SubtitleView {
   constructor(container) {
@@ -15,20 +16,24 @@ export class SubtitleView {
 
   /**
    * @param {Array} rows 字幕の列（古い順）[{ id, source, english, kind }]  kind: 'final'=確定 / 'draft'=速報
-   * @param {{ maxRows: number, gloss: boolean }} options
-   *   maxRows = 同時に表示する数（新しいものから数える）
-   *   gloss   = 単語の上に日本語の意味を出すか
+   * @param {{ gloss: boolean, showSource: boolean, draft: string }} options
+   *   gloss      = 単語の上に日本語の意味を出すか
+   *   showSource = 日本語の原文を出すか
+   *   draft      = 速報訳の出し方（'show' | 'small' | 'hide'）
    */
-  render(rows, { maxRows, gloss }) {
+  render(rows, { gloss, showSource, draft }) {
     const animate = !this.motion.matches;
-    const visible = rows.slice(-maxRows);
+    const visible = rows.slice(-MAX_ROWS);
     const keep = new Set(visible.map((r) => r.id));
 
     // 書き換える前に、いま見えている位置を覚えておく（動いている途中なら、その途中の位置）。
+    // まだ何も表示していない字幕は覚えない。あとで「新しく入ってくる字幕」として扱う。
     const before = new Map();
     if (animate) {
       for (const [id, node] of this.nodes) {
-        if (keep.has(id)) before.set(id, node.getBoundingClientRect().top);
+        if (!keep.has(id) || node.hidden) continue;
+        const rect = node.getBoundingClientRect();
+        if (rect.height > 0) before.set(id, rect.top);
       }
     }
 
@@ -40,7 +45,7 @@ export class SubtitleView {
     }
 
     let previous = null;
-    for (const [index, row] of visible.entries()) {
+    for (const row of visible) {
       let node = this.nodes.get(row.id);
       if (!node) {
         node = document.createElement('div');
@@ -61,14 +66,25 @@ export class SubtitleView {
       }
       if (ja.textContent !== row.source) ja.textContent = row.source;
       if (node.dataset.kind !== row.kind) node.dataset.kind = row.kind;
-      // 新しさ（0 がいちばん新しい）。古い字幕ほど薄く表示するために使う。
-      const age = String(visible.length - 1 - index);
-      if (node.dataset.age !== age) node.dataset.age = age;
+
+      // 表示するものが何もない字幕（原文は非表示、英語はまだ無いか非表示）は、場所を取らないように隠す。
+      const englishShown = !!row.english && !(row.kind === 'draft' && draft === 'hide');
+      const shown = englishShown || (showSource && !!row.source);
+      if (node.hidden === shown) node.hidden = !shown;
 
       // 並び順をそろえる（新しい字幕が下に入る）。
       const expected = previous ? previous.nextSibling : this.container.firstChild;
       if (node !== expected) this.container.insertBefore(node, expected);
       previous = node;
+    }
+
+    // 新しさ（0 がいちばん新しい）。古い字幕ほど薄く表示するために使う。隠している字幕は数えない。
+    let age = 0;
+    for (const row of [...visible].reverse()) {
+      const node = this.nodes.get(row.id);
+      if (node.hidden) continue;
+      if (node.dataset.age !== String(age)) node.dataset.age = String(age);
+      age++;
     }
 
     if (animate) this.glide(before);
@@ -77,7 +93,7 @@ export class SubtitleView {
   // 書き換えで位置が変わった字幕を、元の位置から新しい位置へなめらかに動かす。
   // 手順：新しい位置を測る → いったん元の位置にずらして置く → ずれをゼロに戻す動きを付ける。
   glide(before) {
-    const nodes = [...this.nodes];
+    const nodes = [...this.nodes].filter(([, node]) => !node.hidden);
     for (const [, node] of nodes) {
       node.style.transition = 'none';
       node.style.transform = 'none';
@@ -88,7 +104,7 @@ export class SubtitleView {
         const dy = before.get(id) - node.getBoundingClientRect().top;
         if (Math.abs(dy) > 0.5) moves.push([node, dy, false]);
       } else {
-        // 新しい字幕は、自分の高さぶん下から入ってくる。
+        // 新しく表示する字幕は、自分の高さぶん下から入ってくる。
         moves.push([node, node.offsetHeight, true]);
       }
     }

@@ -11,8 +11,18 @@ import { TRANSLATORS, QUALITY_MODES } from './translate/index.js';
 import { LEVELS, STYLES, GLOSS_OPTIONS, loadPrompt } from './translate/prompt.js';
 import { SubtitlePipeline } from './pipeline.js';
 import { SubtitleView } from './subtitle-view.js';
+import { FONTS, applyFont } from './fonts.js';
 
 const $ = (id) => document.getElementById(id);
+
+// 行間の5段階。gap = 字幕と字幕の間隔、line = 1つの字幕の中の行の高さ（どちらも文字の大きさに対する倍率）。
+const SPACING = {
+  1: { gap: 0.22, line: 1.14 },
+  2: { gap: 0.4, line: 1.22 },
+  3: { gap: 0.6, line: 1.32 },
+  4: { gap: 0.85, line: 1.46 },
+  5: { gap: 1.15, line: 1.62 },
+};
 
 const FONT_MIN = 2.4;
 const FONT_MAX = 10;
@@ -57,7 +67,11 @@ function setState(state) {
 
 function applyDisplay() {
   const d = settings.display;
+  const spacing = SPACING[d.spacing] || SPACING[3];
   $('stage').style.setProperty('--sub-size', `${d.fontSize}vh`);
+  $('stage').style.setProperty('--sub-gap', String(spacing.gap));
+  $('stage').style.setProperty('--sub-line', String(spacing.line));
+  applyFont(d.font, $('stage'));
   $('subs').dataset.source = d.showSource ? 'on' : 'off';
   $('subs').dataset.gloss = d.gloss !== 'off' ? 'on' : 'off';
   $('subs').dataset.draft = d.draft;
@@ -68,7 +82,8 @@ function applyDisplay() {
 }
 
 function renderSubs() {
-  view.render(lastRows, { maxRows: settings.display.rows, gloss: settings.display.gloss !== 'off' });
+  const d = settings.display;
+  view.render(lastRows, { gloss: d.gloss !== 'off', showSource: d.showSource, draft: d.draft });
 }
 
 function updateWelcome() {
@@ -386,12 +401,15 @@ function initControls() {
   if (!LEVELS.some((l) => l.id === t.level)) t.level = 'A1';
   if (!GLOSS_OPTIONS.some((g) => g.id === settings.display.gloss)) settings.display.gloss = 'off';
   if (!['show', 'small', 'hide'].includes(settings.display.draft)) settings.display.draft = 'show';
+  if (!SPACING[settings.display.spacing]) settings.display.spacing = 3;
+  if (!FONTS.some((f) => f.id === settings.display.font)) settings.display.font = 'system';
   fillSelect($('level'), LEVELS, t.level);
   fillSelect($('quickLevel'), LEVELS.map((l) => ({ id: l.id, label: l.id })), t.level);
   fillSelect($('style'), STYLES, t.style);
   fillSelect($('model'), engine.models, t.model);
   fillSelect($('quality'), QUALITY_MODES, t.quality);
-  $('rows').value = String(settings.display.rows);
+  $('spacing').value = String(settings.display.spacing);
+  fillSelect($('font'), FONTS, settings.display.font);
   $('chkSource').checked = settings.display.showSource;
   fillSelect($('gloss'), GLOSS_OPTIONS, settings.display.gloss);
   $('draft').value = settings.display.draft;
@@ -414,8 +432,12 @@ function initControls() {
   $('fontSize').addEventListener('input', () => setFontSize(Number($('fontSize').value)));
   $('btnSmaller').addEventListener('click', () => setFontSize(settings.display.fontSize - 0.4));
   $('btnLarger').addEventListener('click', () => setFontSize(settings.display.fontSize + 0.4));
-  $('rows').addEventListener('change', () => {
-    settings.display.rows = Number($('rows').value);
+  $('spacing').addEventListener('change', () => {
+    settings.display.spacing = Number($('spacing').value);
+    changed();
+  });
+  $('font').addEventListener('change', () => {
+    settings.display.font = $('font').value;
     changed();
   });
   $('chkSource').addEventListener('change', () => {

@@ -102,6 +102,51 @@ export function buildSystem(sections, { level, style, glossary = [], gloss = 'of
   return parts.join('\n\n');
 }
 
+/**
+ * 指示文に書かれた上限を読み取る。アプリはこの数字で訳を点検し、超えていたら短く直させる。
+ *   「1文は6語まで」 → words: 6      「文は2つまで」 → sentences: 2      「字幕は1文だけ」 → sentences: 1
+ * 「15語程度まで」のように「程度」が付くものは目安なので、点検しない（null）。
+ */
+export function limitsFor(sections, { level, style }) {
+  const styleInfo = STYLES.find((s) => s.id === style) || STYLES[0];
+  const levelText = sections.get(`レベル ${level}`) || '';
+  const styleText = sections.get(styleInfo.section) || '';
+  const words = /1文は(\d+)語まで/.exec(levelText);
+  const sentences = /文は(\d+)つまで/.exec(levelText);
+  const onlyOne = /字幕は1文だけ/.test(styleText);
+  return {
+    words: words ? Number(words[1]) : null,
+    sentences: onlyOne ? 1 : sentences ? Number(sentences[1]) : null,
+  };
+}
+
+/** 訳が上限に収まっているかを数える。 */
+export function checkLimits(text, limits) {
+  // 単語の意味の印 {英語|日本語} は英語だけにし、Mr. などの省略のピリオドは文の終わりと数えない。
+  const plain = text.replace(/\{([^{}|]*)\|[^{}]*\}/g, '$1').replace(/\b(Mr|Mrs|Ms|Dr|St|No|vs)\./g, '$1');
+  const sentences = plain
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const counts = sentences.map((s) => s.split(/\s+/).filter((w) => /[A-Za-z0-9]/.test(w)).length);
+  const maxWords = Math.max(0, ...counts);
+  const ok =
+    (!limits.words || maxWords <= limits.words) && (!limits.sentences || sentences.length <= limits.sentences);
+  return { ok, maxWords, sentences: sentences.length };
+}
+
+/** 上限を超えた訳を、短く書き直させるための依頼文。 */
+export function buildFixRequest(limits, found) {
+  const rules = [];
+  if (limits.words) rules.push(`1文は${limits.words}語まで`);
+  if (limits.sentences) rules.push(limits.sentences === 1 ? '文は1つだけ' : `文は${limits.sentences}つまで`);
+  return (
+    `いまの字幕は決まりより長いです（いちばん長い文が${found.maxWords}語、文の数が${found.sentences}）。` +
+    `決まりは「${rules.join('、')}」です。いちばん大事な内容だけを残し、決まりを守って書き直してください。` +
+    '字幕だけを返します。'
+  );
+}
+
 /** 話題メモを作らせるときの指示。 */
 export function buildMemoSystem(sections) {
   return need(sections, '話題メモ');

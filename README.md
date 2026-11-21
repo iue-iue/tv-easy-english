@@ -33,7 +33,8 @@ HTML・CSS・JavaScriptだけで出来ていて、変換作業（ビルド）や
 | `css/app.css` | 字幕画面の見た目（字幕の色、大きさ、設定の引き出し） |
 | `js/app.js` | 字幕画面のボタンと表示の動き |
 | `js/pipeline.js` | 字幕づくりの中心（文の区切り、確定訳の依頼、時間切れの扱い） |
-| `js/subtitle-view.js` | 字幕を画面に描く |
+| `js/subtitle-view.js` | 字幕を画面に描く（位置が変わるときは、なめらかに動かす） |
+| `js/fonts.js` | 英語の字体の一覧と読み込み（字体を足すときはここに追加） |
 | `js/settings.js` | 設定の保存と読み出し（タブレットのブラウザの中だけに保存） |
 | `js/stt/soniox.js` | 音声認識エンジン Soniox との接続 |
 | `js/stt/index.js` | 音声認識エンジンの一覧（エンジンを足すときはここに追加） |
@@ -52,6 +53,7 @@ HTML・CSS・JavaScriptだけで出来ていて、変換作業（ビルド）や
 ## 外部から読み込むもの
 
 - Claudeの公式ライブラリ（`@anthropic-ai/sdk` 1.12.0）を、配信サービス jsDelivr から読み込みます。版は `js/translate/claude.js` の先頭で固定しています。
+- 英語の字体を「標準」以外にした場合だけ、その字体を Google Fonts から読み込みます。
 
 ## パソコンで開いて確かめる
 

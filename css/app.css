@@ -14,7 +14,9 @@
 /* ---- 字幕を出す面 ---- */
 
 .stage {
-  --sub-size: 4.6vh;
+  --sub-size: 4.6vh; /* 文字の大きさ（設定で変わる） */
+  --sub-gap: 0.6; /* 字幕と字幕の間隔（設定の「行間」で変わる） */
+  --sub-line: 1.32; /* 1つの字幕の中の行の高さ（同上） */
   position: fixed;
   inset: 0;
   display: flex;
@@ -137,13 +139,16 @@ body.panel-open .stage {
   display: flex;
   flex-direction: column;
   justify-content: flex-end; /* 新しい字幕が下に入り、古いものは上へ押し出される */
-  gap: calc(var(--sub-size) * 0.6);
+  gap: calc(var(--sub-size) * var(--sub-gap));
   min-height: 0;
   overflow: hidden; /* 下から入ってくる字幕は、この枠の下端から現れる */
   margin-bottom: 104px; /* 下のバーのための空き。バーが隠れている間は狭くする */
-  padding: 48px 3vw 0;
+  padding: 0 3vw;
   font-size: var(--sub-size);
   transition: margin-bottom 0.25s ease;
+  /* 上へ流れていく古い字幕は、上端でだんだん見えなくなる */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 14%);
 }
 
 body.bar-hidden .subs {
@@ -156,8 +161,9 @@ body.bar-hidden .subs {
 
 .sub-en {
   color: var(--sub-color);
+  font-family: var(--sub-font, inherit); /* 設定の「英語の字体」で変わる */
   font-weight: 600;
-  line-height: 1.32;
+  line-height: var(--sub-line);
   overflow-wrap: break-word; /* 単語の途中では改行しない（収まらない長い語だけ例外） */
 }
 
@@ -180,7 +186,7 @@ body.bar-hidden .subs {
 /* 速報（灰色）と、古くなった字幕（薄く） */
 .sub[data-kind="draft"] .sub-en {
   color: var(--sub-dim);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* 速報訳の出し方（設定で切り替え）：小さく表示／表示しない */
@@ -194,25 +200,31 @@ body.bar-hidden .subs {
   display: none;
 }
 
-.subs[data-draft="hide"][data-source="off"] .sub[data-kind="draft"] {
-  display: none;
+/* 古い字幕ほど薄くする（data-age：0 がいちばん新しい） */
+.sub {
+  opacity: 0.4;
+}
+
+.sub[data-age="0"],
+.sub[data-age="1"] {
+  opacity: 1;
 }
 
 .sub[data-age="2"] {
-  opacity: 0.68;
+  opacity: 0.82;
 }
 
 .sub[data-age="3"] {
-  opacity: 0.48;
+  opacity: 0.66;
 }
 
 .sub[data-age="4"] {
-  opacity: 0.34;
+  opacity: 0.52;
 }
 
-/* 単語の上の日本語（ふりがなと同じ仕組み） */
+/* 単語の上の日本語（ふりがなと同じ仕組み）。日本語が載るぶん、行の高さを広げる */
 .subs[data-gloss="on"] .sub-en {
-  line-height: 1.85;
+  line-height: calc(var(--sub-line) + 0.5);
 }
 
 .sub-en ruby {

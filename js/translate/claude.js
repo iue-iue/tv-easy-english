@@ -121,8 +121,11 @@ export class ClaudeTranslator {
     return this.clientPromise;
   }
 
-  /** 字幕1つぶんを訳す。訳は少しずつ届き、届くたびに onText(そこまでの全文) が呼ばれる。 */
-  async translate({ system, user, onText, signal }) {
+  /**
+   * 字幕1つぶんを訳す。訳は少しずつ届き、届くたびに onText(そこまでの全文) が呼ばれる。
+   * followUp = { previous, note } を渡すと、「前の訳（previous）を、note のとおりに書き直して」という依頼になる。
+   */
+  async translate({ system, user, onText, signal, followUp }) {
     let client;
     try {
       client = await this.client();
@@ -130,12 +133,16 @@ export class ClaudeTranslator {
       throw explain({ message: `Claudeの公式ライブラリを読み込めませんでした（${e?.message || e}）` });
     }
     const t = tuning(this.model, this.quality);
+    const messages = [{ role: 'user', content: user }];
+    if (followUp) {
+      messages.push({ role: 'assistant', content: followUp.previous }, { role: 'user', content: followUp.note });
+    }
     const body = {
       model: this.model,
       max_tokens: t.maxTokens,
       // 指示文は毎回同じなので、キャッシュ（使い回し）を指定して費用と遅れを抑える。
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: user }],
+      messages,
       output_config: { effort: t.effort },
     };
     if (t.thinking) body.thinking = t.thinking;

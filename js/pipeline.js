@@ -6,10 +6,20 @@
 //   3. 翻訳エンジンの確定訳が届いたら、それに置き換える。
 //   4. 確定訳が遅い・失敗したときは、速報訳をそのまま確定として先へ進む。
 
-import { buildSystem, buildMemoSystem, buildUser, cleanOutput, isSkipPrefix } from './translate/prompt.js';
+import {
+  buildSystem,
+  buildMemoSystem,
+  buildUser,
+  buildFixRequest,
+  checkLimits,
+  cleanOutput,
+  isSkipPrefix,
+  limitsFor,
+} from './translate/prompt.js';
 
 const FIRST_TEXT_TIMEOUT_MS = 3000; // 確定訳がこの時間までに届き始めなければ、速報訳で先へ進む
 const TOTAL_TIMEOUT_MS = 7000; // 届き始めても、ここまでに終わらなければ打ち切る
+const FIX_TIMEOUT_MS = 3000; // 長すぎた訳の書き直しを待つ時間
 const CONTEXT_ROWS = 5; // 翻訳エンジンに渡す「直前の発言」の数
 const MAX_BATCH = 4; // 訳し待ちがたまったとき、まとめて訳す文の上限
 const MEMO_FIRST_AFTER = 4; // 最初の話題メモを作るまでの文の数
@@ -194,55 +204,55 @@ export class SubtitlePipeline {
     row.state = 'translating';
     this.emit();
 
-    const controller = new AbortController();
-    let gotText = false;
-    let settled = false; // 打ち切ったあとに遅れて届いた分を無視するための印
-
-    // 時間切れ：通信の中断を頼んだうえで、その完了を待たずに先へ進む。
-    let giveUp;
-    const timedOut = new Promise((_, reject) => {
-      giveUp = () => {
-        controller.abort();
-        const e = new Error('確定訳が時間内に届きませんでした');
-        e.aborted = true;
-        reject(e);
-      };
-    });
-    const firstTimer = setTimeout(() => {
-      if (!gotText) giveUp();
-    }, FIRST_TEXT_TIMEOUT_MS);
-    const totalTimer = setTimeout(() => giveUp(), TOTAL_TIMEOUT_MS);
+    // 語数や文の数に上限があるレベルでは、訳を最後まで受け取ってから点検して表示する。
+    // 上限がないレベルでは、届いた分から順に表示する。
+    const limits = limitsFor(this.sections, this.options);
+    const strict = !!(limits.words || limits.sentences);
+    const user = buildUser({ source: row.source, previous: this.history, topic: this.topic });
 
     try {
-      const request = this.translator.translate({
-        system: this.systemPrompt(),
-        user: buildUser({ source: row.source, previous: this.history, topic: this.topic }),
-        signal: controller.signal,
-        onText: (partial) => {
-          if (settled || isSkipPrefix(partial)) return;
-          if (!gotText) {
-            gotText = true;
-            const ms = performance.now() - row.cutAt;
-            this.llmMs = this.llmMs ? this.llmMs * 0.7 + ms * 0.3 : ms;
-          }
-          row.text = cleanOutput(partial).text; // 異常に長い返事などは空になり、画面には出ない
-          this.emit();
-        },
+      const result = await this.request({
+        user,
+        firstTimeoutMs: FIRST_TEXT_TIMEOUT_MS,
+        totalTimeoutMs: TOTAL_TIMEOUT_MS,
+        onPartial: strict ? null : (text) => this.show(row, text),
       });
-      request.catch(() => {}); // 打ち切ったあとの失敗は、ここで受け流す
-      const result = await Promise.race([request, timedOut]);
 
-      const cleaned = cleanOutput(result.text);
+      let cleaned = cleanOutput(result.text);
       if (result.refused || cleaned.invalid) {
         // モデルが応答を断った場合や、字幕として異常な返事（長すぎるなど）の場合は、速報訳で先へ進む
         row.text = '';
         this.finishWithDraft(row);
-      } else if (cleaned.skip) {
-        this.remove(row); // 字幕にする内容がない（あいづち、BGMの誤認識など）
-      } else {
-        row.text = cleaned.text;
-        this.finish(row, 'done');
+        return;
       }
+      if (cleaned.skip) {
+        this.remove(row); // 字幕にする内容がない（あいづち、BGMの誤認識など）
+        return;
+      }
+
+      // 上限を超えていたら、1回だけ短く書き直させる。書き直しが間に合わなければ、最初の訳を使う。
+      if (strict) {
+        const found = checkLimits(cleaned.text, limits);
+        if (!found.ok) {
+          try {
+            const second = await this.request({
+              user,
+              followUp: { previous: cleaned.text, note: buildFixRequest(limits, found) },
+              firstTimeoutMs: FIX_TIMEOUT_MS,
+              totalTimeoutMs: FIX_TIMEOUT_MS,
+            });
+            const fixed = cleanOutput(second.text);
+            if (!second.refused && !fixed.invalid && !fixed.skip) cleaned = fixed;
+          } catch (e) {
+            if (e?.fatal) {
+              this.show(row, cleaned.text); // 最初の訳は使ったうえで、下の「何度やっても失敗するもの」の扱いに回す
+              throw e;
+            }
+          }
+        }
+      }
+      this.show(row, cleaned.text);
+      this.finish(row, 'done');
     } catch (e) {
       if (row.text) {
         this.finish(row, 'done'); // 途中まで届いていれば、そこまでを確定とする
@@ -256,6 +266,57 @@ export class SubtitlePipeline {
       } else if (!e?.aborted) {
         this.onNotice?.({ kind: 'translator-temporary', message: e?.message || String(e) });
       }
+    }
+  }
+
+  // 確定訳を画面に出す。最初に出したときに、文の区切りからかかった時間を記録する（遅れの目安に使う）。
+  show(row, text) {
+    if (!text) return;
+    if (!row.text) {
+      const ms = performance.now() - row.cutAt;
+      this.llmMs = this.llmMs ? this.llmMs * 0.7 + ms * 0.3 : ms;
+    }
+    row.text = text;
+    this.emit();
+  }
+
+  // 翻訳エンジンに1回依頼する。時間切れになったら、通信の完了を待たずに失敗として先へ進む。
+  //   firstTimeoutMs = 訳が届き始めるまでの制限、totalTimeoutMs = 全体の制限
+  //   onPartial      = 届いた分を順に受け取る関数（なければ最後にまとめて受け取る）
+  async request({ user, followUp, firstTimeoutMs, totalTimeoutMs, onPartial }) {
+    const controller = new AbortController();
+    let gotText = false;
+    let settled = false; // 打ち切ったあとに遅れて届いた分を無視するための印
+
+    let giveUp;
+    const timedOut = new Promise((_, reject) => {
+      giveUp = () => {
+        controller.abort();
+        const e = new Error('確定訳が時間内に届きませんでした');
+        e.aborted = true;
+        reject(e);
+      };
+    });
+    const firstTimer = setTimeout(() => {
+      if (!gotText) giveUp();
+    }, firstTimeoutMs);
+    const totalTimer = setTimeout(() => giveUp(), totalTimeoutMs);
+
+    try {
+      const pending = this.translator.translate({
+        system: this.systemPrompt(),
+        user,
+        followUp,
+        signal: controller.signal,
+        onText: (partial) => {
+          if (settled) return;
+          gotText = true;
+          if (!onPartial || isSkipPrefix(partial)) return;
+          onPartial(cleanOutput(partial).text); // 異常に長い返事などは空になり、画面には出ない
+        },
+      });
+      pending.catch(() => {}); // 打ち切ったあとの失敗は、ここで受け流す
+      return await Promise.race([pending, timedOut]);
     } finally {
       settled = true;
       clearTimeout(firstTimer);

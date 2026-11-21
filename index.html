@@ -99,13 +99,19 @@
           <input id="fontSize" type="range" min="2.4" max="10" step="0.2">
         </label>
         <label class="stack">
-          <span class="label">同時に表示する字幕の数</span>
-          <select id="rows" class="select">
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
+          <span class="label">行間</span>
+          <select id="spacing" class="select">
+            <option value="1">狭い</option>
+            <option value="2">やや狭い</option>
+            <option value="3">標準</option>
+            <option value="4">やや広い</option>
+            <option value="5">広い</option>
           </select>
+        </label>
+        <p class="hint">画面に入る字幕の数は、文字の大きさと行間で決まります。古い字幕は上へ流れて消えます。</p>
+        <label class="stack">
+          <span class="label">英語の字体</span>
+          <select id="font" class="select"></select>
         </label>
         <label class="switch">
           <input type="checkbox" id="chkSource">
@@ -124,7 +130,7 @@
           <span class="label">単語に日本語の意味を付ける</span>
           <select id="gloss" class="select"></select>
         </label>
-        <p class="hint">選んだ範囲の単語の上に、日本語を小さく出します。それより易しい単語には付きません。1つの字幕で3つまでです。次の文から反映されます。</p>
+        <p class="hint">選んだ範囲の単語の上に、日本語を小さく出します。それより易しい単語には付きません。1つの字幕で5つまでです。次の文から反映されます。</p>
       </section>
 
       <section class="panel-sec">
