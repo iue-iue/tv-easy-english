@@ -1,0 +1,373 @@
+/* 字幕画面の見た目。共通の部品（ボタン、入力欄、スイッチ）は style.css のものを使う。 */
+
+.app {
+  --panel-w: min(400px, 92vw); /* 設定の引き出しの幅 */
+  --stage-bg: #000;
+  --sub-color: #e2e2e2; /* 確定した字幕：真っ白より少しグレー（暗い部屋でまぶしくないように） */
+  --sub-dim: #8d959f; /* 速報の字幕 */
+  --sub-ja: #8a929c; /* 日本語の原文 */
+  --sub-gloss: #c3ccd6; /* 単語の上の日本語 */
+  overflow: hidden;
+  background: var(--stage-bg);
+}
+
+/* ---- 字幕を出す面 ---- */
+
+.stage {
+  --sub-size: 4.6vh;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--stage-bg);
+  transition: right 0.2s ease;
+}
+
+/* 引き出しを開いている間は、字幕の面を左に寄せる（字幕が隠れないように） */
+body.panel-open .stage {
+  right: var(--panel-w);
+}
+
+.status {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--sub-ja);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.st-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #56606b;
+}
+
+.st-state[data-state="open"] .dot {
+  background: var(--ok);
+}
+
+.st-state[data-state="connecting"] .dot,
+.st-state[data-state="reconnecting"] .dot {
+  background: var(--warn);
+}
+
+.mini-meter {
+  width: 64px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #222932;
+}
+
+#miniFill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--ok);
+}
+
+#miniFill[data-clip="on"] {
+  background: var(--bad);
+}
+
+.notice {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  z-index: 4;
+  width: max-content;
+  max-width: min(92%, 760px);
+  padding: 10px 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--bad);
+  border-radius: 12px;
+  background: rgba(40, 14, 14, 0.94);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+/* ---- 止まっているときの案内 ---- */
+
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 24px 24px 120px;
+  text-align: center;
+}
+
+.welcome h1 {
+  font-size: 1.6rem;
+}
+
+.welcome-text {
+  max-width: 34em;
+  color: var(--muted);
+}
+
+.btn-start {
+  min-width: 220px;
+  min-height: 84px;
+  border-radius: 18px;
+  font-size: 1.5rem;
+}
+
+/* ---- 字幕 ---- */
+
+.subs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* 新しい字幕が下に入り、古いものは上へ押し出される */
+  align-items: center;
+  gap: calc(var(--sub-size) * 0.6);
+  min-height: 0;
+  overflow: hidden;
+  padding: 48px 4vw 104px;
+  font-size: var(--sub-size);
+}
+
+.sub {
+  width: min(100%, 44ch); /* 1行およそ42字まで */
+  animation: sub-in 0.18s ease-out;
+}
+
+.sub-en {
+  color: var(--sub-color);
+  font-weight: 600;
+  line-height: 1.32;
+  overflow-wrap: break-word; /* 単語の途中では改行しない（収まらない長い語だけ例外） */
+  text-wrap: balance;
+}
+
+.sub-ja {
+  margin-top: 0.3em;
+  color: var(--sub-ja);
+  font-size: 0.46em;
+  line-height: 1.45;
+}
+
+.sub-en:empty,
+.sub-ja:empty {
+  display: none;
+}
+
+.subs[data-source="off"] .sub-ja {
+  display: none;
+}
+
+/* 速報（灰色）と、古くなった字幕（薄く） */
+.sub[data-kind="draft"] .sub-en {
+  color: var(--sub-dim);
+  font-weight: 500;
+}
+
+.sub[data-age="2"] {
+  opacity: 0.68;
+}
+
+.sub[data-age="3"] {
+  opacity: 0.48;
+}
+
+.sub[data-age="4"] {
+  opacity: 0.34;
+}
+
+/* 単語の上の日本語（ふりがなと同じ仕組み） */
+.subs[data-gloss="on"] .sub-en {
+  line-height: 1.85;
+}
+
+.sub-en ruby {
+  ruby-align: center; /* 日本語を単語の中央に寄せる（字間を広げない） */
+}
+
+.sub-en rt {
+  color: var(--sub-gloss);
+  font-size: 0.42em;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+  user-select: none;
+}
+
+@keyframes sub-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35em);
+  }
+}
+
+/* ---- 下の細いバー ---- */
+
+.bar {
+  position: absolute;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 24px);
+  padding: 10px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(19, 24, 30, 0.94);
+  transition: opacity 0.25s;
+}
+
+body.bar-hidden .bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bar-main {
+  min-width: 120px;
+}
+
+.bar-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.bar-field .select {
+  width: auto;
+  min-width: 84px;
+}
+
+.bar-size {
+  display: flex;
+  gap: 6px;
+}
+
+.bar-size .btn {
+  min-width: 60px;
+  padding: 0 12px;
+}
+
+/* ---- 右から出る設定の引き出し ---- */
+
+.panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-w);
+  transform: translateX(100%);
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  transition: transform 0.2s ease;
+}
+
+body.panel-open .panel {
+  transform: none;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-head h2 {
+  font-size: 1.1rem;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 18px 32px;
+}
+
+.panel-sec {
+  display: grid;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-sec:last-child {
+  border-bottom: 0;
+}
+
+.panel-sec h3 {
+  font-size: 1rem;
+}
+
+.panel-sec .switch:first-of-type {
+  border-top: 0;
+}
+
+.panel-sec a.btn {
+  text-decoration: none;
+}
+
+.panel input[type="range"] {
+  width: 100%;
+  height: 36px;
+  accent-color: var(--accent);
+}
+
+.panel output {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* ---- 幅の狭い画面では、引き出しを字幕の上に重ねる ---- */
+
+@media (max-width: 760px) {
+  body.panel-open .stage {
+    right: 0;
+  }
+
+  .bar-field span {
+    display: none;
+  }
+
+  .bar {
+    gap: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage,
+  .panel,
+  .bar {
+    transition: none;
+  }
+
+  .sub {
+    animation: none;
+  }
+}

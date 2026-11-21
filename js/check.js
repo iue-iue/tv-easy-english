@@ -240,7 +240,7 @@ function stopSource() {
   sourceKind = null;
   replayId = null;
   releaseWakeLock();
-  $('actual').hidden = true;
+  // 「実際の入力」の表示は、止めたあとも残す（内容を控えたり、写真に撮ったりできるように）。
   render();
 }
 
@@ -352,7 +352,7 @@ function showActual(info, requestedId) {
       'dl',
       {},
       el('dt', { text: '実際の入力' }),
-      el('dd', {}, el('b', { text: info.label || '（名前なし）' })),
+      el('dd', {}, el('b', { text: info.label || '（名前なし）' }), `（${MODE_LABEL[settings.input.mode]}として使用）`),
       el('dt', { text: '音の形式' }),
       el('dd', { text: format.join(' ') }),
       el('dt', { text: '音の加工' }),
@@ -512,7 +512,7 @@ async function saveLong(pcm, info, mode) {
   const processing = {};
   for (const [key] of PROCESSING) processing[key] = typeof info[key] === 'boolean' ? info[key] : requested[key];
 
-  const genre = $('genre').value;
+  const genre = $('genre').value; // 「指定なし」のときは空
   const memo = $('memo').value.trim();
   const meta = {
     id: newId(),

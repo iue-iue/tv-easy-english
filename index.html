@@ -2,30 +2,135 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0c0f">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
   <meta name="robots" content="noindex">
   <title>やさしい英語字幕</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
-  <main class="home">
-    <h1>やさしい英語字幕</h1>
-    <p class="lead">テレビの日本語音声を聞き取り、やさしい英語（Plain English）の字幕にして表示するアプリです。いまは最初の段階（音の入り口の確認）まで出来ています。字幕の画面は次の段階でここに入ります。</p>
+<body class="app">
+  <!-- 字幕を出す画面 -->
+  <main id="stage" class="stage">
+    <!-- 右上の小さな表示：状態、遅れの目安、英語のレベル、入力の大きさ -->
+    <div class="status" aria-live="polite">
+      <span id="stState" class="st-state" data-state="idle"><i class="dot" aria-hidden="true"></i><span id="stStateText">停止中</span></span>
+      <span id="stDelay" class="st-item" hidden></span>
+      <span id="stLevel" class="st-item"></span>
+      <span class="mini-meter" role="img" aria-label="入力の大きさ"><span id="miniFill"></span></span>
+    </div>
 
-    <a class="tile" href="check.html">
-      <b>音の入り口の確認を開く</b>
-      <span>マイクでテレビの音が拾えるかを、メーターと録音で確かめます。</span>
-    </a>
+    <!-- お知らせ（エラーなど） -->
+    <div id="notice" class="notice" role="alert" hidden></div>
 
-    <ol class="phases">
-      <li data-done><span class="tag">フェーズ0</span><span>音の入り口の確認（いまここ）</span></li>
-      <li><span class="tag">フェーズ1</span><span>最小の字幕：音声認識と翻訳をつなぐ</span></li>
-      <li><span class="tag">フェーズ2</span><span>翻訳エンジンの比較</span></li>
-      <li><span class="tag">フェーズ3</span><span>音声認識エンジンの比較</span></li>
-      <li><span class="tag">フェーズ4</span><span>仕上げ：ホーム画面への追加、用語集、利用量の表示</span></li>
-    </ol>
+    <!-- 止まっているときの案内 -->
+    <section id="welcome" class="welcome">
+      <h1>やさしい英語字幕</h1>
+      <p id="welcomeText" class="welcome-text"></p>
+      <button id="btnStartBig" class="btn btn-primary btn-start" type="button">開始</button>
+    </section>
+
+    <!-- 字幕。新しいものが下に入り、古いものは上へ流れて薄くなる -->
+    <div id="subs" class="subs"></div>
+
+    <!-- 下の細いバー。画面を押すと出て、数秒で消える -->
+    <div id="bar" class="bar">
+      <button id="btnToggle" class="btn btn-primary bar-main" type="button">開始</button>
+      <label class="bar-field">
+        <span>レベル</span>
+        <select id="quickLevel" class="select"></select>
+      </label>
+      <div class="bar-size" role="group" aria-label="文字の大きさ">
+        <button id="btnSmaller" class="btn" type="button" aria-label="文字を小さく">A−</button>
+        <button id="btnLarger" class="btn" type="button" aria-label="文字を大きく">A＋</button>
+      </div>
+      <button id="btnPanel" class="btn" type="button" aria-expanded="false" aria-controls="panel">設定</button>
+    </div>
   </main>
+
+  <!-- 右から出る設定の引き出し。開いている間も字幕は続く -->
+  <aside id="panel" class="panel" aria-label="設定" inert>
+    <header class="panel-head">
+      <h2>設定</h2>
+      <button id="btnPanelClose" class="btn btn-small" type="button">閉じる</button>
+    </header>
+
+    <div class="panel-body">
+      <section class="panel-sec">
+        <h3>APIキー</h3>
+        <p class="hint">各サービスを使うための合言葉です。このタブレットの中だけに保存され、外には公開されません。変更は、次に「開始」を押したときから反映されます。</p>
+        <label class="stack">
+          <span class="label">Soniox（音声認識と速報訳）</span>
+          <input id="keySoniox" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="Sonioxのキーを貼り付け">
+        </label>
+        <label class="stack">
+          <span class="label">Claude（確定訳）</span>
+          <input id="keyAnthropic" class="input" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant- で始まるキーを貼り付け">
+        </label>
+        <label class="check"><input type="checkbox" id="chkShowKeys"> キーの文字を表示する</label>
+      </section>
+
+      <section class="panel-sec">
+        <h3>翻訳</h3>
+        <label class="stack">
+          <span class="label">英語のレベル</span>
+          <select id="level" class="select"></select>
+        </label>
+        <label class="stack">
+          <span class="label">訳し方</span>
+          <select id="style" class="select"></select>
+        </label>
+        <label class="stack">
+          <span class="label">翻訳モデル</span>
+          <select id="model" class="select"></select>
+        </label>
+        <label class="stack">
+          <span class="label">品質モード</span>
+          <select id="quality" class="select"></select>
+        </label>
+        <p class="hint">翻訳の設定は、次の文から反映されます。</p>
+      </section>
+
+      <section class="panel-sec">
+        <h3>表示</h3>
+        <label class="stack">
+          <span class="label">文字の大きさ <output id="fontSizeOut"></output></span>
+          <input id="fontSize" type="range" min="2.4" max="10" step="0.2">
+        </label>
+        <label class="stack">
+          <span class="label">同時に表示する字幕の数</span>
+          <select id="rows" class="select">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="chkSource">
+          <span class="switch-ui" aria-hidden="true"></span>
+          <span class="switch-text"><b>日本語の原文を表示</b><small>英語の字幕の下に、聞き取った日本語を小さく出します。</small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="chkGloss">
+          <span class="switch-ui" aria-hidden="true"></span>
+          <span class="switch-text"><b>単語に日本語の意味を付ける</b><small>選んだレベルちょうどの単語の上に、日本語を小さく出します。それより易しい単語には付きません。次の文から反映されます。</small></span>
+        </label>
+      </section>
+
+      <section class="panel-sec">
+        <h3>音の入力</h3>
+        <label class="stack">
+          <span class="label">字幕にする音</span>
+          <select id="source" class="select"></select>
+        </label>
+        <p class="hint">マイクの種類（内蔵マイク／有線）や音の加工は、確認ページで変えられます。入力元の変更は、次に「開始」を押したときから反映されます。</p>
+        <a class="btn" href="check.html">音の入り口の確認ページを開く</a>
+      </section>
+    </div>
+  </aside>
+
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

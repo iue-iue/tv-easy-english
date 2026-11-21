@@ -11,7 +11,7 @@
 </head>
 <body>
   <header class="top">
-    <a class="top-back" href="./">ホーム</a>
+    <a class="top-back" href="./">字幕画面へ</a>
     <h1>音の入り口の確認</h1>
     <span id="status" class="pill" data-state="idle">停止中</span>
   </header>
@@ -111,13 +111,14 @@
         <p>音声認識や翻訳のエンジンを、同じ音で比べるための録音です。3分で自動的に止まります。録音はこのタブレットの中だけに保存され、外へは送られません。</p>
         <div class="row wrap">
           <label class="stack">
-            <span class="label">番組の種類</span>
+            <span class="label">番組の種類（任意）</span>
             <select id="genre" class="select">
-              <option>ニュース</option>
+              <option value="">指定なし</option>
+              <option>ドキュメンタリー</option>
               <option>情報番組</option>
-              <option>バラエティ</option>
+              <option>ニュース</option>
               <option>ドラマ</option>
-              <option>その他</option>
+              <option>バラエティ</option>
             </select>
           </label>
           <label class="stack grow">
