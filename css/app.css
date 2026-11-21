@@ -2,11 +2,13 @@
 
 .app {
   --panel-w: min(400px, 92vw); /* 設定の引き出しの幅 */
-  --stage-bg: #000;
+  /* 配色は、背景と文字の2色で決まる（設定の「配色」で変わる。一覧は js/themes.js）。 */
+  --stage-bg: #000; /* 背景 */
   --sub-color: #e2e2e2; /* 確定した字幕：真っ白より少しグレー（暗い部屋でまぶしくないように） */
-  --sub-dim: #8d959f; /* 速報の字幕 */
-  --sub-ja: #8a929c; /* 日本語の原文 */
-  --sub-gloss: #c3ccd6; /* 単語の上の日本語 */
+  /* 残りの色は、文字の色を背景の色に寄せて自動で作る。数字が小さいほど背景に近く、目立たない。 */
+  --sub-dim: color-mix(in srgb, var(--sub-color) 58%, var(--stage-bg)); /* 速報の字幕 */
+  --sub-ja: color-mix(in srgb, var(--sub-color) 56%, var(--stage-bg)); /* 日本語の原文 */
+  --sub-gloss: color-mix(in srgb, var(--sub-color) 82%, var(--stage-bg)); /* 単語の上の日本語 */
   overflow: hidden;
   background: var(--stage-bg);
 }
@@ -113,6 +115,7 @@ body.panel-open .stage {
   justify-items: center;
   gap: 18px;
   padding: 24px 24px 120px;
+  color: var(--sub-color); /* 明るい背景の配色でも読めるように、字幕と同じ色を使う */
   text-align: center;
 }
 
@@ -122,7 +125,7 @@ body.panel-open .stage {
 
 .welcome-text {
   max-width: 34em;
-  color: var(--muted);
+  color: var(--sub-ja);
 }
 
 .btn-start {
@@ -365,6 +368,28 @@ body.panel-open .panel {
 .panel output {
   color: var(--muted);
   font-weight: 400;
+}
+
+/* 「自分で色を選ぶ」のときの、色の入力欄 */
+.color-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.color-field {
+  display: grid;
+  gap: 6px;
+}
+
+.color-field input[type="color"] {
+  width: 100%;
+  height: var(--tap);
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+  cursor: pointer;
 }
 
 /* ---- 幅の狭い画面では、引き出しを字幕の上に重ねる ---- */

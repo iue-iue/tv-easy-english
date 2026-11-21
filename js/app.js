@@ -12,6 +12,7 @@ import { LEVELS, STYLES, GLOSS_OPTIONS, loadPrompt } from './translate/prompt.js
 import { SubtitlePipeline } from './pipeline.js';
 import { SubtitleView } from './subtitle-view.js';
 import { FONTS, applyFont } from './fonts.js';
+import { THEMES, applyTheme, themeColors } from './themes.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -72,6 +73,8 @@ function applyDisplay() {
   $('stage').style.setProperty('--sub-gap', String(spacing.gap));
   $('stage').style.setProperty('--sub-line', String(spacing.line));
   applyFont(d.font, $('stage'));
+  applyTheme(d);
+  $('customColors').hidden = d.theme !== 'custom';
   $('subs').dataset.source = d.showSource ? 'on' : 'off';
   $('subs').dataset.gloss = d.gloss !== 'off' ? 'on' : 'off';
   $('subs').dataset.draft = d.draft;
@@ -403,6 +406,10 @@ function initControls() {
   if (!['show', 'small', 'hide'].includes(settings.display.draft)) settings.display.draft = 'show';
   if (!SPACING[settings.display.spacing]) settings.display.spacing = 3;
   if (!FONTS.some((f) => f.id === settings.display.font)) settings.display.font = 'system';
+  if (!THEMES.some((th) => th.id === settings.display.theme)) settings.display.theme = 'soft';
+  const isColor = (value) => /^#[0-9a-f]{6}$/i.test(value);
+  if (!isColor(settings.display.textColor)) settings.display.textColor = '#e2e2e2';
+  if (!isColor(settings.display.bgColor)) settings.display.bgColor = '#000000';
   fillSelect($('level'), LEVELS, t.level);
   fillSelect($('quickLevel'), LEVELS.map((l) => ({ id: l.id, label: l.id })), t.level);
   fillSelect($('style'), STYLES, t.style);
@@ -410,6 +417,9 @@ function initControls() {
   fillSelect($('quality'), QUALITY_MODES, t.quality);
   $('spacing').value = String(settings.display.spacing);
   fillSelect($('font'), FONTS, settings.display.font);
+  fillSelect($('theme'), THEMES, settings.display.theme);
+  $('textColor').value = settings.display.textColor;
+  $('bgColor').value = settings.display.bgColor;
   $('chkSource').checked = settings.display.showSource;
   fillSelect($('gloss'), GLOSS_OPTIONS, settings.display.gloss);
   $('draft').value = settings.display.draft;
@@ -440,6 +450,29 @@ function initControls() {
     settings.display.font = $('font').value;
     changed();
   });
+  $('theme').addEventListener('change', () => {
+    const next = $('theme').value;
+    if (next === 'custom' && settings.display.theme !== 'custom') {
+      // 「自分で色を選ぶ」に切り替えたときは、直前の配色の色から始める。
+      const current = themeColors(settings.display);
+      settings.display.textColor = current.text;
+      settings.display.bgColor = current.bg;
+      $('textColor').value = current.text;
+      $('bgColor').value = current.bg;
+    }
+    settings.display.theme = next;
+    changed();
+  });
+  for (const [id, key] of [
+    ['textColor', 'textColor'],
+    ['bgColor', 'bgColor'],
+  ]) {
+    // 色を選んでいる最中にも画面に反映する。
+    $(id).addEventListener('input', () => {
+      settings.display[key] = $(id).value;
+      changed();
+    });
+  }
   $('chkSource').addEventListener('change', () => {
     settings.display.showSource = $('chkSource').checked;
     changed();
