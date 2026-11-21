@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0c0f">
+  <meta name="robots" content="noindex">
+  <title>音の入り口の確認｜やさしい英語字幕</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="top-back" href="./">ホーム</a>
+    <h1>音の入り口の確認</h1>
+    <span id="status" class="pill" data-state="idle">停止中</span>
+  </header>
+
+  <!-- 画面の上に貼り付く帯：開始/停止ボタンとレベルメーター -->
+  <section class="meterbar" aria-label="入力の大きさ">
+    <div class="meterbar-in">
+      <button id="btnToggle" class="btn btn-primary btn-big" type="button">入力を開始</button>
+      <div class="meter-wrap">
+        <div id="meter" class="meter" role="meter" aria-label="入力の大きさ（dB）" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60">
+          <div id="meterCover" class="meter-cover"></div>
+          <div id="meterPeak" class="meter-peak"></div>
+        </div>
+        <div class="meter-scale" aria-hidden="true">
+          <span style="left:0%">-60</span>
+          <span style="left:33.33%">-40</span>
+          <span style="left:66.67%">-20</span>
+          <span style="left:80%">-12</span>
+          <span style="left:95%" class="wide-only">-3</span>
+          <span style="left:100%">0 dB</span>
+        </div>
+        <p class="meter-text">
+          <span id="meterRead" class="meter-read">－</span>
+          <span id="clipBadge" class="badge badge-bad" hidden>音割れ</span>
+          <span id="advice" class="advice" data-state="off"></span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="alert-wrap"><div id="alert" class="alert" role="alert" hidden></div></div>
+
+  <main class="cols">
+    <div class="col">
+      <section class="card">
+        <h2><span class="num">1</span>入力の設定</h2>
+        <fieldset id="inputSet" class="plain">
+          <legend class="sr-only">入力の設定</legend>
+
+          <div class="field">
+            <span class="label">入力方法</span>
+            <div class="seg" role="radiogroup" aria-label="入力方法">
+              <label><input type="radio" name="mode" id="modeMic" value="mic"><span>内蔵マイク</span></label>
+              <label><input type="radio" name="mode" id="modeLine" value="line"><span>有線（USB）</span></label>
+            </div>
+            <p id="modeHint" class="hint"></p>
+          </div>
+
+          <div class="field">
+            <label class="label" for="device">入力機器</label>
+            <div class="row">
+              <select id="device" class="select grow"></select>
+              <button id="btnRefresh" class="btn" type="button">一覧を更新</button>
+            </div>
+            <p id="deviceNote" class="hint"></p>
+          </div>
+
+          <div class="field">
+            <span class="label">音の加工</span>
+            <label class="switch">
+              <input type="checkbox" id="chkEc">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span class="switch-text"><b>エコーキャンセル</b><small>タブレット自身のスピーカーの音が、マイクに回り込むのを消す機能。テレビの音まで削ることがあります。</small></span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="chkNs">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span class="switch-text"><b>ノイズ抑制</b><small>「サー」という雑音を減らす機能。音楽の流れる場面で、声まで削ることがあります。</small></span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="chkAgc">
+              <span class="switch-ui" aria-hidden="true"></span>
+              <span class="switch-text"><b>自動音量調整</b><small>小さい音を自動で大きくする機能。離れたテレビの音をマイクで拾うときに役立ちます。</small></span>
+            </label>
+          </div>
+        </fieldset>
+
+        <div id="actual" class="actual" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">2</span>10秒録音して再生</h2>
+        <p>テレビの音を10秒録って、聞き直します。言葉が聞き取れれば、音声認識にも使える音です。</p>
+        <div class="row wrap">
+          <button id="btnShort" class="btn btn-primary" type="button">10秒録音する</button>
+          <span id="shortMsg" class="hint"></span>
+        </div>
+        <progress id="shortBar" max="10" value="0" hidden></progress>
+        <audio id="shortAudio" controls hidden></audio>
+        <p class="hint">再生の音が小さいときは、上の「停止」を押して入力を止めてから再生してください。</p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card">
+        <h2><span class="num">3</span>比較用の録音（2〜3分）</h2>
+        <p>音声認識や翻訳のエンジンを、同じ音で比べるための録音です。3分で自動的に止まります。録音はこのタブレットの中だけに保存され、外へは送られません。</p>
+        <div class="row wrap">
+          <label class="stack">
+            <span class="label">番組の種類</span>
+            <select id="genre" class="select">
+              <option>ニュース</option>
+              <option>情報番組</option>
+              <option>バラエティ</option>
+              <option>ドラマ</option>
+              <option>その他</option>
+            </select>
+          </label>
+          <label class="stack grow">
+            <span class="label">メモ（任意）</span>
+            <input id="memo" class="input" type="text" maxlength="40" placeholder="例：夜7時のニュース" autocomplete="off">
+          </label>
+        </div>
+        <div class="row wrap">
+          <button id="btnLong" class="btn btn-primary" type="button">録音を開始</button>
+          <span id="longTime" class="timer" hidden>0:00 / 3:00</span>
+          <span id="longMsg" class="hint"></span>
+        </div>
+        <progress id="longBar" max="180" value="0" hidden></progress>
+
+        <h3>保存した録音 <span id="recTotal" class="hint"></span></h3>
+        <p class="hint">「入力として流す」を押すと、録音をマイクの代わりにアプリへ流します（上のメーターが動きます）。次の段階からは、同じ音を何度でも字幕にして比べられます。</p>
+        <label class="check"><input type="checkbox" id="chkAudible"> 流すときにスピーカーからも音を出す</label>
+        <p id="recEmpty" class="empty">まだ録音はありません。</p>
+        <ul id="recList" class="rec-list"></ul>
+      </section>
+
+      <section class="card">
+        <details>
+          <summary><h2><span class="num">4</span>有線（USB）入力の確認</h2></summary>
+          <p>USBオーディオインターフェース（テレビの音をUSBでタブレットに入れる機器）が届いてから行います。Android版のChromeには「USBの入力を選んでも、実際は内蔵マイクのまま」という不具合の報告があるため、本当にUSBから入っているかを確かめます。</p>
+          <ol class="steps">
+            <li>テレビの「スピーカーとイヤホン音声の同時出力」を「する」にして、テレビのイヤホン端子 → USBオーディオインターフェース → タブレットの順につなぐ。</li>
+            <li>上の「1 入力の設定」で「有線（USB）」を選び、入力機器でUSBの機器を選んで「入力を開始」を押す。</li>
+            <li>テレビの音を出したまま、下の①を押す。</li>
+            <li>テレビのイヤホン端子からケーブルを抜き、下の②を押す。</li>
+          </ol>
+          <div class="measure">
+            <div class="row wrap">
+              <button id="btnMeasureA" class="btn" type="button">① つないだまま測る（5秒）</button>
+              <span id="measureA" class="hint"></span>
+            </div>
+            <div class="row wrap">
+              <button id="btnMeasureB" class="btn" type="button" disabled>② ケーブルを抜いて測る（5秒）</button>
+              <span id="measureB" class="hint"></span>
+            </div>
+            <p id="verdict" class="verdict" hidden></p>
+          </div>
+          <p class="hint">考え方：USBから入っていれば、ケーブルを抜くと音が止まります。内蔵マイクに戻っていると、テレビのスピーカーの音を拾い続けるので、抜いてもメーターが動きます。</p>
+          <h3>ケーブルを抜いても音が入り続けるとき</h3>
+          <ol class="steps">
+            <li>入力機器を「おまかせ」にして、USB機器を挿したままChromeを開き直す。Androidは、USBの音声機器をつなぐと既定の入力をそちらへ切り替えることがあります。</li>
+            <li>それでも内蔵マイクのままなら、このアプリをAndroidアプリとして包み、入力を直接指定する方法があります。必要になった時点でご案内します。</li>
+            <li>内蔵マイクで認識が足りていれば、有線は使わずに進めます。</li>
+          </ol>
+        </details>
+      </section>
+
+      <section class="card">
+        <h2><span class="num">5</span>合格の目安</h2>
+        <ul class="goals">
+          <li>内蔵マイクで、テレビの音に合わせてメーターが動く。</li>
+          <li>10秒録音を再生して、言葉が聞き取れる。</li>
+          <li>有線を使う場合：ケーブルを抜くとメーターが止まる。</li>
+        </ul>
+        <p class="hint">dB（デシベル）は音の大きさの単位です。0 が上限で、人が話しているときの「最大」が -20〜-3 に入っていれば十分です。</p>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="js/check.js"></script>
+</body>
+</html>
